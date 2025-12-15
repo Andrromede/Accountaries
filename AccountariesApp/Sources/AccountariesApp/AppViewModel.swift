@@ -11,8 +11,6 @@ final class AppViewModel: ObservableObject {
 
     @Published var budgetSnapshot: BudgetSnapshot
 
-    private let baseFixedCharges: Double = 1400
-
     init() {
         let goals = [
             Goal(name: "Vacances", target: 1500, deadline: Calendar.current.date(byAdding: .month, value: 6, to: .now), saved: 400),
@@ -55,7 +53,7 @@ final class AppViewModel: ObservableObject {
 
         self.budgetSnapshot = .init(
             revenues: 0,
-            fixedCharges: baseFixedCharges,
+            fixedCharges: 0,
             variableExpenses: 0,
             goalSavings: 0,
             accountSavings: 0
@@ -79,6 +77,7 @@ final class AppViewModel: ObservableObject {
 
     private func recalculateBudgetSnapshot() {
         var revenues = 0.0
+        var fixedCharges = 0.0
         var variableExpenses = 0.0
         var goalSavings = 0.0
         var accountSavings = 0.0
@@ -88,7 +87,11 @@ final class AppViewModel: ObservableObject {
             case .income:
                 revenues += movement.amount
             case .expense:
-                variableExpenses += movement.amount
+                if movement.category.caseInsensitiveCompare("Charges fixes") == .orderedSame {
+                    fixedCharges += movement.amount
+                } else {
+                    variableExpenses += movement.amount
+                }
             case .transfer:
                 if let destination = movement.destination {
                     switch destination {
@@ -103,7 +106,7 @@ final class AppViewModel: ObservableObject {
 
         budgetSnapshot = BudgetSnapshot(
             revenues: revenues,
-            fixedCharges: baseFixedCharges,
+            fixedCharges: fixedCharges,
             variableExpenses: variableExpenses,
             goalSavings: goalSavings,
             accountSavings: accountSavings
