@@ -53,62 +53,74 @@ final class AppViewModel: ObservableObject {
         self.goals = goals
         self.savingsAccounts = savingsAccounts
 
-        self.budgetSnapshot = BudgetSnapshot(
-            revenues: 3200,
+        self.budgetSnapshot = .init(
+            revenues: 0,
             fixedCharges: baseFixedCharges,
-            variableExpenses: 750,
-            goalSavings: 200,
-            accountSavings: 150
+            variableExpenses: 0,
+            goalSavings: 0,
+            accountSavings: 0
         )
+
+        recalculateBudgetSnapshot()
     }
 
     func addMovement(_ movement: Movement) {
         movements.append(movement)
-        applyBudgetAdjustments(for: movement, adding: true)
+        applyDestinationBalance(for: movement, adding: true)
+        recalculateBudgetSnapshot()
     }
 
     func removeMovements(at offsets: IndexSet) {
         let removed = offsets.map { movements[$0] }
         movements.remove(atOffsets: offsets)
-        removed.forEach { applyBudgetAdjustments(for: $0, adding: false) }
+        removed.forEach { applyDestinationBalance(for: $0, adding: false) }
+        recalculateBudgetSnapshot()
     }
 
-    private func applyBudgetAdjustments(for movement: Movement, adding: Bool) {
-        let factor = adding ? 1.0 : -1.0
+    private func recalculateBudgetSnapshot() {
+        var revenues = 0.0
+        var variableExpenses = 0.0
+        var goalSavings = 0.0
+        var accountSavings = 0.0
 
-        switch movement.type {
-        case .income:
-            budgetSnapshot.revenues += movement.amount * factor
-        case .expense:
-            budgetSnapshot.variableExpenses += movement.amount * factor
-        case .transfer:
-            if let destination = movement.destination {
-                applyDestinationAdjustment(destination, amount: movement.amount, factor: factor)
+        for movement in movements {
+            switch movement.type {
+            case .income:
+                revenues += movement.amount
+            case .expense:
+                variableExpenses += movement.amount
+            case .transfer:
+                if let destination = movement.destination {
+                    switch destination {
+                    case .goal:
+                        goalSavings += movement.amount
+                    case .savings:
+                        accountSavings += movement.amount
+                    }
+                }
             }
         }
 
-        if let destination = movement.destination {
-            updateDestinationBalances(destination, amount: movement.amount * factor)
-        }
+        budgetSnapshot = BudgetSnapshot(
+            revenues: revenues,
+            fixedCharges: baseFixedCharges,
+            variableExpenses: variableExpenses,
+            goalSavings: goalSavings,
+            accountSavings: accountSavings
+        )
     }
 
-    private func applyDestinationAdjustment(_ destination: Movement.Destination, amount: Double, factor: Double) {
-        switch destination {
-        case .goal:
-            budgetSnapshot.goalSavings += amount * factor
-        case .savings:
-            budgetSnapshot.accountSavings += amount * factor
-        }
-    }
+    private func applyDestinationBalance(for movement: Movement, adding: Bool) {
+        guard let destination = movement.destination else { return }
+        let factor = adding ? 1.0 : -1.0
 
-    private func updateDestinationBalances(_ destination: Movement.Destination, amount: Double) {
         switch destination {
         case .goal(let goal):
             guard let index = goals.firstIndex(where: { $0.id == goal.id }) else { return }
-            goals[index].saved = max(0, goals[index].saved + amount)
+            goals[index].saved = max(0, goals[index].saved + movement.amount * factor)
         case .savings(let account):
             guard let index = savingsAccounts.firstIndex(where: { $0.id == account.id }) else { return }
-            savingsAccounts[index].balance = max(0, savingsAccounts[index].balance + amount)
+            savingsAccounts[index].balance = max(0, savingsAccounts[index].balance + movement.amount * factor)
         }
     }
 
