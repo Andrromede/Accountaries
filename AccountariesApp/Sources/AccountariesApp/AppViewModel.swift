@@ -127,7 +127,9 @@ final class AppViewModel: ObservableObject {
         }
     }
 
-    enum Section: CaseIterable, Hashable {
+    enum Section: CaseIterable, Hashable, Identifiable {
+        var id: Self { self }
+
         case dashboard, movements, charts, goals, savings, budgetTable, envelopes, rules, automations, settings
 
         var title: String {
